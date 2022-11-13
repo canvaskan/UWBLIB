@@ -1,6 +1,7 @@
 {
     "files.associations": {
         "uwblib.h": "c",
-        "loadobs": "c"
+        "loadobs": "c",
+        "gsl_interp.h": "c"
     }
 }

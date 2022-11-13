@@ -39,6 +39,10 @@ void decodeBinaryObs(const Config *config)
 {
     for (int i = 0; i < CONFIG_MAX_OBS_FILE_N; i++)
     {
+        if (config->obs_files[i] == NULL)
+        {
+            continue;
+        }
         FILE *fr = fopen(config->obs_files[i], "rb");
 
         char obs_file[MAX_LINE_LEN] = "";
@@ -193,7 +197,7 @@ void decodeBinaryObs(const Config *config)
             }
         }
 
-        // close
+        // CLOSE!!! and FREE!!!
         fclose(fr);
         fclose(fw_obs);
         fclose(fw_heartbeat);

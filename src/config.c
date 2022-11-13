@@ -29,6 +29,24 @@ void readConfig(const char *config_file, Config *config)
             chop(opt);
             strcpy(config->anchor_file, opt);
         }
+        else if (strstr(line, "start_time"))
+        {
+            opt = strchr(line, '=') + 1;
+            chop(opt);
+            str2time_json(opt, 0, 19, &(config->start_time));
+        }
+        else if (strstr(line, "end_time"))
+        {
+            opt = strchr(line, '=') + 1;
+            chop(opt);
+            str2time_json(opt, 0, 19, &(config->end_time));
+        }
+        else if (strstr(line, "interval_sec"))
+        {
+            opt = strchr(line, '=') + 1;
+            chop(opt);
+            config->interval_sec = atof(opt);
+        }
         else if (strstr(line, "pos_method"))
         {
             opt = strchr(line, '=') + 1;
