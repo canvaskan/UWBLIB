@@ -1,5 +1,6 @@
 {
     "files.associations": {
-        "uwblib.h": "c"
+        "uwblib.h": "c",
+        "loadobs": "c"
     }
 }

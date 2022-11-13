@@ -17,11 +17,12 @@ int main(int argc, char const *argv[])
     AnchorTable anchor_table;
     readAnchorTable(&config, &anchor_table);
     
-    // 2 read and decode binary obs file
+    // 2 decode binary obs file, and write ascii file
     decodeBinaryObs(&config);
 
+    // 3 read ascii file to memory
     ObsTable obs_table;
-    HeartbeatTable heartbeat_table;
+    loadObsTable(&config, &obs_table);
 
     return 0;
 }

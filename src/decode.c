@@ -43,10 +43,10 @@ void decodeBinaryObs(const Config *config)
 
         char obs_file[MAX_LINE_LEN] = "";
         strcpy(obs_file, config->obs_files[i]);
-        FILE *fw_obs = fopen(strcat(obs_file, ".obs"), "w");
+        FILE *fw_obs = fopen(strcat(obs_file, DECODE_ASCII_OBS_SUFFIX), "w");
 
         strcpy(obs_file, config->obs_files[i]);
-        FILE *fw_heartbeat = fopen(strcat(obs_file, ".heartbeat"), "w");
+        FILE *fw_heartbeat = fopen(strcat(obs_file, DECODE_ASCII_HEARTBEAT_SUFFIX), "w");
 
         if (!fr)
         {

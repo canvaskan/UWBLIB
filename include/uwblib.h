@@ -33,7 +33,7 @@ typedef struct
 /// @brief chop trailing spaces and '\n', see '#' as comment
 /// @param str str to be chop
 void chop(char *str);
-
+int str2time_json(const char *s, int i, int n, gtime_t *t);
 int str2time(const char *s, int i, int n, gtime_t *t);
 gtime_t epoch2time(const double *ep);
 
@@ -80,6 +80,16 @@ void readAnchorTable(const Config *config, AnchorTable *anchor_table);
 
 /* DECODE START ===========================================*/
 #define DECODE_MAX_OBS_RECORD 28800
+#define DECODE_ASCII_OBS_SUFFIX ".obs"
+#define DECODE_ASCII_HEARTBEAT_SUFFIX ".heartbeat"
+
+/// @brief decode binary obs and save to .txt readable format
+/// @param config
+void decodeBinaryObs(const Config *config);
+
+/* DECODE END =============================================*/
+
+/* LOADOBS START ==========================================*/
 
 typedef struct
 {
@@ -109,10 +119,9 @@ typedef struct
     HeartbeatRecord heartbeat_records[DECODE_MAX_OBS_RECORD];
 } HeartbeatTable;
 
-/// @brief decode binary obs and save to .txt readable format
-/// @param config 
-void decodeBinaryObs(const Config *config);
+void loadObsTable(const Config* config, ObsTable* obs_table);
+void imputeTime(ObsTable *obs_table);
+void interpTime(ObsTable *obs_table);
 
-/* DECODE END =============================================*/
-
+/* LOADOBS END ============================================*/
 #endif
