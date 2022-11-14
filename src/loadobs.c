@@ -238,9 +238,17 @@ void interpObsTable(const ObsTable *obs_table, ObsTable *obs_table_new, const gt
     for (int anchor_i = 0; anchor_i < unique_anchor_n; anchor_i++)
     {
         int anchor_id = unique_anchor_ids[anchor_i];
+        if (anchor_id == 0)
+        {
+            continue;
+        }
         for (int tag_i = 0; tag_i < unique_tag_n; tag_i++)
         {
             int tag_id = unique_tag_ids[tag_i];
+            if (tag_id == 0)
+            {
+                continue;
+            }
             printf("INFO: processing pair anchor_id=%d, tag_id=%d\n", anchor_id, tag_id);
 
             // count how many data record this anchor-tag pair has
@@ -316,6 +324,8 @@ void interpObsTable(const ObsTable *obs_table, ObsTable *obs_table_new, const gt
                 obs_table_new->obs_records[obs_new_i].time.time = floor(x_new[i]);
                 obs_table_new->obs_records[obs_new_i].time.sec = x_new[i] - floor(x_new[i]);
                 obs_table_new->obs_records[obs_new_i].distance = y_new[i];
+                obs_table_new->obs_records[obs_new_i].anchor_id = anchor_id;
+                obs_table_new->obs_records[obs_new_i].tag_id = tag_id;
                 obs_new_i++;
             }
 

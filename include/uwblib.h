@@ -145,7 +145,7 @@ typedef struct
     int distance; // cm
     int battery;  // 1%-100%
     int SOS;      // 0:No, 1:Yes
-    int mobile;   // 0:No, 1:Moving
+    int mobile;   // 0:No, other:Moving
 } ObsRecord;
 
 typedef struct
