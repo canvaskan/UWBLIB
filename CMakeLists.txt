@@ -25,6 +25,8 @@ header_directories(INCLUDES ${PROJECT_SOURCE_DIR}/include/ h)
 
 message(STATUS ${SRCS})
 add_executable(${PROJECT_N} ${SRCS})
-target_link_libraries(${PROJECT_N} m)
+
+find_package(GSL REQUIRED)
+target_link_libraries(${PROJECT_N} m GSL::gsl GSL::gslcblas)
 
 target_include_directories(${PROJECT_N} PUBLIC include)

@@ -118,7 +118,7 @@ void makeTimeSeries(gtimeSeries *time_series, gtime_t start_time, gtime_t end_ti
     time_series->times = (gtime_t *)malloc(time_series->n * sizeof(gtime_t));
     if (time_series->times == NULL)
     {
-        printf("ERORR! makeTimeSeries cannot alloc memory!\n");
+        printf("ERROR! makeTimeSeries cannot alloc memory!\n");
         exit(EXIT_FAILURE);
     }
     for (int i = 0; i < time_series->n; i++)
@@ -131,4 +131,18 @@ void freeTimeSeries(gtimeSeries *time_series)
 {
     free(time_series->times);
     memset(time_series, 0, sizeof(gtimeSeries));
+}
+
+void linearInterp(const double *x, const double *y, const double n, const double *x_new, double *y_new, const double n_new)
+{
+    gsl_interp_accel *acc = gsl_interp_accel_alloc();
+    gsl_spline *spline = gsl_spline_alloc(gsl_interp_linear, n);
+    gsl_spline_init(spline, x, y, n);
+    for(int i=0;i<n_new;i++)
+    {
+        double xi = x_new[i];
+        y_new[i] = gsl_spline_eval(spline, xi, acc);
+    }
+    gsl_spline_free(spline);
+    gsl_interp_accel_free(acc);
 }

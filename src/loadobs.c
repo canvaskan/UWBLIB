@@ -5,6 +5,10 @@ void loadObsTable(const Config *config, ObsTable *obs_table)
     int obs_i = 0;
     for (int i = 0; i < CONFIG_MAX_OBS_FILE_N; i++)
     {
+        if (config->obs_files[i][0] == '\0')
+        {
+            continue;
+        }
         char obs_file[MAX_LINE_LEN] = "";
         strcpy(obs_file, config->obs_files[i]);
         FILE *fr = fopen(strcat(obs_file, DECODE_ASCII_OBS_SUFFIX), "r");
@@ -51,6 +55,12 @@ void loadObsTable(const Config *config, ObsTable *obs_table)
 
             obs_i++;
         }
+        fclose(fr);
+    }
+    if (obs_i > LOADOBS_MAX_RECORD_N)
+    {
+        printf("ERROR: loadObsTable detect more obs records than LOADOBS_MAX_RECORD_N! change its value and retry\n");
+        exit(EXIT_FAILURE);
     }
     obs_table->obs_n = obs_i;
 }
@@ -143,36 +153,176 @@ void sortByTime(ObsTable *obs_table)
     qsort(obs_table->obs_records, obs_table->obs_n, sizeof(ObsRecord), compareByTime);
 }
 
-void interpTime(const ObsTable *obs_table, ObsTable *obs_table_new, const gtimeSeries *time_series)
+int uniqueAnchorID(const ObsTable *obs_table, int *unique_anchor_ids)
 {
     // find unique anchor ids
-    int uni_anchor_ids[ANCHOR_MAX_N] = {0};
-    for(int obs_i =0;obs_i<obs_table->obs_n;obs_i++)
+    int uni_anchor_i = 0;
+    for (int obs_i = 0; obs_i < obs_table->obs_n; obs_i++)
     {
+        int is_unique = 1;
         int anchor_id = obs_table->obs_records[obs_i].anchor_id;
-        uni_anchor_ids[0] = anchor_id;
-        // TODO
+        for (int i = 0; i < uni_anchor_i; i++)
+        {
+            if (anchor_id == unique_anchor_ids[i])
+            {
+                is_unique = 0;
+                break;
+            }
+        }
+        if (is_unique)
+        {
+            unique_anchor_ids[uni_anchor_i] = anchor_id;
+            uni_anchor_i++;
+        }
     }
-    // MALLOC!!!
-    obs_table_new->obs_n = time_series->n;
-    double *x = malloc(obs_table->obs_n * sizeof(double));
-    double *y = malloc(obs_table->obs_n * sizeof(double));
-    double *x_new = malloc(obs_table_new->obs_n * sizeof(double));
-    double *y_new = malloc(obs_table_new->obs_n * sizeof(double));
+    if (uni_anchor_i > ANCHOR_MAX_ID_N)
+    {
+        printf("ERROR: uniqueAnchorID detect %d Anchor ID > ANCHOR_MAX_ID_N = %d, need to change ANCHOR_MAX_ID_N value!\n",
+               uni_anchor_i, ANCHOR_MAX_ID_N);
+        exit(EXIT_FAILURE);
+    }
+    return uni_anchor_i;
+}
 
-    // load value, x:time, y:
+int uniqueTagID(const ObsTable *obs_table, int *unique_tag_ids)
+{
+    // find unique tag ids
+    int uni_tag_i = 0;
+    for (int obs_i = 0; obs_i < obs_table->obs_n; obs_i++)
+    {
+        int is_unique = 1;
+        int tag_id = obs_table->obs_records[obs_i].tag_id;
+        for (int i = 0; i < uni_tag_i; i++)
+        {
+            if (tag_id == unique_tag_ids[i])
+            {
+                is_unique = 0;
+                break;
+            }
+        }
+        if (is_unique)
+        {
+            unique_tag_ids[uni_tag_i] = tag_id;
+            uni_tag_i++;
+        }
+    }
+    if (uni_tag_i > LOADOBS_MAX_TAG_N)
+    {
+        printf("ERROR: uniqueTagID detect %d Anchor ID > LOADOBS_MAX_TAG_N = %d, need to change LOADOBS_MAX_TAG_N value!\n",
+               uni_tag_i, LOADOBS_MAX_TAG_N);
+        exit(EXIT_FAILURE);
+    }
+    return uni_tag_i;
+}
 
-    // linear interpolation
-    // use gsl library
+void interpObsTable(const ObsTable *obs_table, ObsTable *obs_table_new, const gtimeSeries *time_series,
+                    const int *unique_anchor_ids, const int unique_anchor_n, const int *unique_tag_ids, const int unique_tag_n)
+{
+    int obs_new_i = 0;
+    // check memory size
+    if (time_series->n > LOADOBS_MAX_INTERP_RECORD_N)
+    {
+        printf("ERROR: interpObsTable detect time_series->n = %d > LOADOBS_MAX_INTERP_RECORD_N = %d, need to change LOADOBS_MAX_INTERP_RECORD_N value!\n",
+               time_series->n, LOADOBS_MAX_INTERP_RECORD_N);
+        exit(EXIT_FAILURE);
+    }
 
+    // new time sample points
+    double *x_new = malloc(time_series->n * sizeof(double));
+    for (int i = 0; i < time_series->n; i++)
+    {
+        x_new[i] = time_series->times[i].time + time_series->times[i].sec;
+    }
 
-    // FREE!!!
-    free(x);
-    free(y);
+    // for each anchor-tag pair, do linear interp
+    for (int anchor_i = 0; anchor_i < unique_anchor_n; anchor_i++)
+    {
+        int anchor_id = unique_anchor_ids[anchor_i];
+        for (int tag_i = 0; tag_i < unique_tag_n; tag_i++)
+        {
+            int tag_id = unique_tag_ids[tag_i];
+            printf("INFO: processing pair anchor_id=%d, tag_id=%d\n", anchor_id, tag_id);
+
+            // count how many data record this anchor-tag pair has
+            int data_i = 0;
+            for (int obs_i = 0; obs_i < obs_table->obs_n; obs_i++)
+            {
+                // if match anchor and tag id
+                if (obs_table->obs_records[obs_i].anchor_id == anchor_id && obs_table->obs_records[obs_i].tag_id == tag_id)
+                {
+                    data_i++;
+                }
+            }
+            printf("INFO: pair anchor_id=%d, tag_id=%d has %d data records\n", anchor_id, tag_id, data_i);
+
+            // allocate fitting array
+            double *x = malloc(data_i * sizeof(double));
+            double *y = malloc(data_i * sizeof(double));
+            double *y_new = malloc(time_series->n * sizeof(double));
+
+            // load data of anchor-tag pair
+            int xi = 0;
+            for (int obs_i = 0; obs_i < obs_table->obs_n; obs_i++)
+            {
+                // if match anchor and tag id
+                if (obs_table->obs_records[obs_i].anchor_id == anchor_id && obs_table->obs_records[obs_i].tag_id == tag_id)
+                {
+                    x[xi] = obs_table->obs_records[obs_i].time.time + obs_table->obs_records[obs_i].time.sec;
+                    y[xi] = obs_table->obs_records[obs_i].distance;
+                    // if same time measurement, add a little time to keep x incremental
+                    if (xi > 1 && x[xi] - x[xi - 1] < 0.1)
+                    {
+                        x[xi] += 0.1;
+                    }
+                    xi++;
+                }
+            }
+
+            // check x_new is in range(x.min, x.max)
+            int is_in_range = 1;
+            double xmin = gsl_stats_min(x, 1, data_i);
+            double xmax = gsl_stats_max(x, 1, data_i);
+            for (int i = 0; i < time_series->n; i++)
+            {
+                if (x_new[i] > xmax)
+                {
+                    printf("WARNING: interpObsTable anchor_id=%d, tag_id=%d, time x_new[i]=%lf>xmax=%lf!\n", anchor_id, tag_id, x_new[i], xmax);
+                    is_in_range = 0;
+                    break;
+                }
+                else if (x_new[i] < xmin)
+                {
+                    printf("WARNING: interpObsTable anchor_id=%d, tag_id=%d, time x_new[i]=%lf<xmin=%lf!\n", anchor_id, tag_id, x_new[i], xmin);
+                    is_in_range = 0;
+                    break;
+                }
+            }
+            if (is_in_range == 0)
+            {
+                printf("WARNING: skip processing pair anchor_id=%d, tag_id=%d\n", anchor_id, tag_id);
+                free(x);
+                free(y);
+                free(y_new);
+                continue;
+            }
+
+            // linear interp
+            linearInterp(x, y, data_i, x_new, y_new, time_series->n);
+
+            // store data in obs table new
+            obs_table_new->obs_n += time_series->n;
+            for (int i = 0; i < time_series->n; i++)
+            {
+                obs_table_new->obs_records[obs_new_i].time.time = floor(x_new[i]);
+                obs_table_new->obs_records[obs_new_i].time.sec = x_new[i] - floor(x_new[i]);
+                obs_table_new->obs_records[obs_new_i].distance = y_new[i];
+                obs_new_i++;
+            }
+
+            free(x);
+            free(y);
+            free(y_new);
+        }
+    }
     free(x_new);
-    free(y_new);
-    x = NULL;
-    y = NULL;
-    x_new = NULL;
-    y_new = NULL;
 }

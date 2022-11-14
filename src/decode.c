@@ -39,7 +39,7 @@ void decodeBinaryObs(const Config *config)
 {
     for (int i = 0; i < CONFIG_MAX_OBS_FILE_N; i++)
     {
-        if (config->obs_files[i] == NULL)
+        if (config->obs_files[i][0] == '\0')
         {
             continue;
         }
@@ -54,12 +54,12 @@ void decodeBinaryObs(const Config *config)
 
         if (!fr)
         {
-            printf("ERORR: decodeBinaryObs cannot open obs file\n");
+            printf("ERROR: decodeBinaryObs cannot open obs file\n");
             exit(EXIT_FAILURE);
         }
         if (!fw_obs || !fw_heartbeat)
         {
-            printf("ERORR: decodeBinaryObs cannot open obs/heartbeat txt file to write\n");
+            printf("ERROR: decodeBinaryObs cannot open obs/heartbeat txt file to write\n");
             exit(EXIT_FAILURE);
         }
 
@@ -72,13 +72,13 @@ void decodeBinaryObs(const Config *config)
         char *buffer = (char *)malloc(sizeof(char) * fsize);
         if (!buffer)
         {
-            printf("ERORR: decodeBinaryObs cannot allocate memory!\n");
+            printf("ERROR: decodeBinaryObs cannot allocate memory!\n");
             exit(EXIT_FAILURE);
         }
         size_t read_size = fread(buffer, 1, fsize, fr);
         if (read_size != fsize)
         {
-            printf("ERORR: decodeBinaryObs reading error!\n");
+            printf("ERROR: decodeBinaryObs reading error!\n");
             exit(EXIT_FAILURE);
         }
 
@@ -197,7 +197,7 @@ void decodeBinaryObs(const Config *config)
             }
         }
 
-        // CLOSE!!! and FREE!!!
+        // close and free
         fclose(fr);
         fclose(fw_obs);
         fclose(fw_heartbeat);

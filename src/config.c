@@ -10,7 +10,8 @@ void readConfig(const char *config_file, Config *config)
 
     if(!fp)
     {
-        printf("ERROR! readConfig cannot open config file!\n");
+        system("pwd");
+        printf("ERROR: readConfig cannot open config file %s!\n", config_file);
         exit(EXIT_FAILURE);
     }
 

@@ -30,13 +30,20 @@ int main(int argc, char const *argv[])
     // 5 sort all obs
     sortByTime(&obs_table);
 
-    // 6 create time series MALLOC!!!
+    // 6 get unique obs anchor ids and tag ids
+    int unique_anchor_ids[ANCHOR_MAX_ID_N] = {0};
+    int unique_tag_ids[LOADOBS_MAX_TAG_N] = {0};
+    int unique_anchor_n = uniqueAnchorID(&obs_table, unique_anchor_ids);
+    int unique_tag_n = uniqueTagID(&obs_table, unique_tag_ids);
+
+    // 7 create time series MALLOC!!!
     gtimeSeries time_series = {0};
     makeTimeSeries(&time_series, config.start_time, config.end_time, config.interval_sec);
 
-    // 7 interp obs to new obs at time series
+    // 8 interp obs to new obs at time series
     ObsTable obs_table_new = {0};
-    interpTime(&obs_table, &obs_table_new, &time_series);
+    interpObsTable(&obs_table, &obs_table_new, &time_series, unique_anchor_ids, unique_anchor_n, unique_tag_ids, unique_tag_n);
+
 
 
     // Free!!!

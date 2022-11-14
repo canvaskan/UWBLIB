@@ -32,4 +32,5 @@ void readAnchorTable(const Config *config, AnchorTable *anchor_table)
             exit(EXIT_FAILURE);
         }
     }
+    fclose(fp);
 }

@@ -20,7 +20,8 @@
 #include <stdint.h>
 #include <math.h>
 #include <time.h>
-#include <gsl/gsl_interp.h>
+#include <gsl/gsl_spline.h>
+#include <gsl/gsl_statistics.h>
 
 #define MAX_LINE_LEN 1024
 
@@ -59,6 +60,15 @@ gtime_t epoch2time(const double *ep);
 void makeTimeSeries(gtimeSeries *time_series, gtime_t start_time, gtime_t end_time, double interval_sec);
 void freeTimeSeries(gtimeSeries *time_series);
 
+/// @brief linear interpolation, GSL wrapper
+/// @param x      I data point x coor
+/// @param y      I data point y coor
+/// @param n      I number of data point
+/// @param x_new  I interp point x coor
+/// @param y_new  O interp point y coor
+/// @param n_new  I number of interp point
+void linearInterp(const double *x, const double *y, const double n, const double *x_new, double *y_new, const double n_new);
+
 /* UTILS END ==============================================*/
 
 /* CONFIG START ===========================================*/
@@ -90,6 +100,7 @@ void readConfig(const char *config_file, Config *config);
 #define ANCHOR_MAX_NAME_LEN 10
 #define ANCHOR_MAX_ANT_N 2
 #define ANCHOR_MAX_N 4
+#define ANCHOR_MAX_ID_N ANCHOR_MAX_N *ANCHOR_MAX_ANT_N
 typedef struct
 {
     char anchor_name[ANCHOR_MAX_NAME_LEN];
@@ -123,6 +134,8 @@ void decodeBinaryObs(const Config *config);
 /* LOADOBS START ==========================================*/
 #define LOADOBS_MAX_RECORD_N 86400
 #define LOADOBS_MAX_IMPUTE_SPAN 3
+#define LOADOBS_MAX_TAG_N 4
+#define LOADOBS_MAX_INTERP_RECORD_N 86400
 
 typedef struct
 {
@@ -163,15 +176,34 @@ void loadObsTable(const Config *config, ObsTable *obs_table);
 /// @param obs_table  IO obs table to be imputed
 void imputeTime(ObsTable *obs_table);
 
+/// @brief sort obs_table by time, old->new, inplace
+/// @param obs_table IO ObsTable
 void sortByTime(ObsTable *obs_table);
 
-/// @brief after imputed and sorted,
+/// @brief find unique anchor id in obs table
+/// @param obs_table          I obs table
+/// @param unique_anchor_ids  O unique anchor ids
+/// @return                     number of unique anchor ids
+int uniqueAnchorID(const ObsTable *obs_table, int *unique_anchor_ids);
+
+/// @brief find unique tag id in obs table
+/// @param obs_table          I obs table
+/// @param unique_tag_ids     O unique tag ids
+/// @return                     number of unique tag ids
+int uniqueTagID(const ObsTable *obs_table, int *unique_tag_ids);
+
+/// @brief after imputed and sorted, every anchor-tag pair in
 /// obs table should be interp to evenly-spaced epochs indicated by gtimeSeries,
 /// gtimeSeries can be created by makeTimeSeries, and freed by FreeTimeSeries
-/// @param obs_table      I   imputed and sorted but uneven obs
-/// @param obs_table_new  O   evenly-spaced obs
-/// @param time_series    I   evenly-spaced time series
-void interpTime(const ObsTable *obs_table, ObsTable *obs_table_new, const gtimeSeries *time_series);
+/// @param obs_table         I   imputed and sorted but uneven obs
+/// @param obs_table_new     O   evenly-spaced obs
+/// @param time_series       I   evenly-spaced time series
+/// @param unique_anchor_ids I   unique anchor ids
+/// @param unique_anchor_n   I   number of unique anchor ids
+/// @param unique_tag_ids    I   unique tag ids
+/// @param unique_tag_n      I   number of unique tag ids
+void interpObsTable(const ObsTable *obs_table, ObsTable *obs_table_new, const gtimeSeries *time_series,
+                    const int *unique_anchor_ids, const int unique_anchor_n, const int *unique_tag_ids, const int unique_tag_n);
 
 /* LOADOBS END ============================================*/
 #endif
