@@ -55,6 +55,14 @@ int main(int argc, char const *argv[])
     AnchorTable anchor_table = {0};
     readAnchorTable(&config, &anchor_table);
 
+    // 3 PROCESS EPOCH
+    for(int epoch_i = 0; epoch_i<time_series.n; epoch_i++)
+    {
+        
+    }
+
+
+
 
 
 

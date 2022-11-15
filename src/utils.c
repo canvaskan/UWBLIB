@@ -138,11 +138,48 @@ void linearInterp(const double *x, const double *y, const double n, const double
     gsl_interp_accel *acc = gsl_interp_accel_alloc();
     gsl_spline *spline = gsl_spline_alloc(gsl_interp_linear, n);
     gsl_spline_init(spline, x, y, n);
-    for(int i=0;i<n_new;i++)
+    for (int i = 0; i < n_new; i++)
     {
         double xi = x_new[i];
         y_new[i] = gsl_spline_eval(spline, xi, acc);
     }
     gsl_spline_free(spline);
     gsl_interp_accel_free(acc);
+}
+
+gsl_matrix *inverseMatrix(const gsl_matrix *mat)
+{
+    if (mat->size1 != mat->size2)
+    {
+        printf("ERROR: inverseMatrix need square matrix\n");
+        exit(EXIT_FAILURE);
+    }
+    gsl_permutation *p = gsl_permutation_alloc(mat->size1 * mat->size2);
+    int s;
+
+    // Compute the LU decomposition of this matrix
+    gsl_linalg_LU_decomp(mat, p, &s);
+
+    // Compute the  inverse of the LU decomposition
+    gsl_matrix *inv = gsl_matrix_alloc(mat->size1, mat->size2);
+    gsl_linalg_LU_invert(mat, p, inv);
+
+    gsl_permutation_free(p);
+
+    return inv;
+}
+
+void solveLSQ(const gsl_matrix *B, const gsl_matrix *P, const gsl_matrix *l, gsl_matrix *x, gsl_matrix *Dx)
+{
+    gsl_matrix *BTP = gsl_matrix_alloc(B->size2, P->size2);
+    gsl_blas_dgemm(CblasTrans, CblasNoTrans, 1.0, B, P, 0.0, BTP);
+    gsl_matrix *BTPB = gsl_matrix_alloc(BTP->size1, B->size2);
+    gsl_blas_dgemm(CblasNoTrans, CblasNoTrans, 1.0, BTP, B, 0.0, BTPB);
+    Dx = inverseMatrix(BTPB);
+    gsl_matrix *BTPl = gsl_matrix_alloc(BTP->size1, l->size2);
+    gsl_blas_dgemm(CblasNoTrans, CblasNoTrans, 1.0, Dx, BTPl, 0.0, x);
+
+    gsl_matrix_free(BTP);
+    gsl_matrix_free(BTPB);
+    gsl_matrix_free(BTPl);
 }
