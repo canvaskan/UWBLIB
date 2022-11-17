@@ -34,3 +34,35 @@ void readAnchorTable(const Config *config, AnchorTable *anchor_table)
     }
     fclose(fp);
 }
+
+void getAnchorPosByID(const AnchorTable *anchor_table, const int anchor_id, double *n, double *e, double *u)
+{
+    int found = 0;
+    for(int i=0;i<ANCHOR_MAX_N;i++)
+    {
+        if(anchor_table->anchor_records[i].anchor_name[0] == '\0')
+        {
+            continue;
+        }
+        for(int j=0;j<ANCHOR_MAX_ANT_N;j++)
+        {
+            if(anchor_table->anchor_records[i].ants[j] == anchor_id)
+            {
+                *n = anchor_table->anchor_records[i].n;
+                *e = anchor_table->anchor_records[i].e;
+                *u = anchor_table->anchor_records[i].u;
+                found =1;
+                break;
+            }
+        }
+        if(found)
+        {
+            break;
+        }
+    }
+    if(!found)
+    {
+        printf("ERROR: getAnchorPosByID not found!\n");
+        exit(EXIT_FAILURE);
+    }
+}

@@ -51,8 +51,10 @@ void chop(char *str);
 int str2time_json(const char *s, int i, int n, gtime_t *t);
 int str2time(const char *s, int i, int n, gtime_t *t);
 gtime_t timeadd(gtime_t t, double sec);
-extern double timediff(gtime_t t1, gtime_t t2);
+double timediff(gtime_t t1, gtime_t t2);
 gtime_t epoch2time(const double *ep);
+void time2epoch(gtime_t t, double *ep);
+void time2str(gtime_t t, char *s, int n);
 
 /// @brief make evenly-spaced time series, use MALLOC!!!, free by freeTimeSeries
 /// @param time_series  O
@@ -73,8 +75,14 @@ void linearInterp(const double *x, const double *y, const double n, const double
 
 /// @brief inverse matrix using LU decomposition
 /// @param mat matrix to invert
-/// @return inverse matrix, need gsl_matrix_free!!!
-gsl_matrix *inverseMatrix(const gsl_matrix *mat);
+/// @param inv result inv matrix
+/// @return inverse matrix
+void inverseMatrix(const gsl_matrix *mat, gsl_matrix * inv);
+
+
+/// @brief print %g auto formated gsl matrix
+/// @param mat matrix to be printed
+void printfMatrix(const gsl_matrix *mat);
 
 /// @brief solve lsq: V = B@x - l
 /// @param B  I coeffient or design matrix
@@ -82,7 +90,7 @@ gsl_matrix *inverseMatrix(const gsl_matrix *mat);
 /// @param l  I OMC, observation minus computation
 /// @param x  O estimated params, x = inv(B.T@P@B)@(B.T@P@l)
 /// @param Dx O estimated covariance, Dx = inv(B.T@P@B)
-void solveLSQ(const gsl_matrix*B, const gsl_matrix*P, const gsl_matrix*l, gsl_matrix*x, gsl_matrix*Dx);
+void solveLSQ(const gsl_matrix *B, const gsl_matrix *P, const gsl_matrix *l, gsl_matrix *x, gsl_matrix *Dx);
 
 /* UTILS END ==============================================*/
 
@@ -133,6 +141,14 @@ typedef struct
 /// @param anchor_table O anchor table struct
 void readAnchorTable(const Config *config, AnchorTable *anchor_table);
 
+/// @brief get anchor position by anchor id
+/// @param anchor_table I anchor table read by readAnchorTable
+/// @param anchor_id    I anchor id
+/// @param n            O north
+/// @param e            O east
+/// @param u            O up
+void getAnchorPosByID(const AnchorTable *anchor_table, const int anchor_id, double *n, double *e, double *u);
+
 /* ANCHOR END =============================================*/
 
 /* DECODE START ===========================================*/
@@ -147,10 +163,8 @@ void decodeBinaryObs(const Config *config);
 /* DECODE END =============================================*/
 
 /* LOADOBS START ==========================================*/
-#define LOADOBS_MAX_RECORD_N 86400
 #define LOADOBS_MAX_IMPUTE_SPAN 3
 #define LOADOBS_MAX_TAG_N 4
-#define LOADOBS_MAX_INTERP_RECORD_N 86400
 
 typedef struct
 {
@@ -162,13 +176,13 @@ typedef struct
     int SOS;      // 0:No, 1:Yes
     int mobile;   // 0:No, other:Moving
 
-    int is_interp;// 0:No, 1:Yes
+    int is_interp; // 0:No, 1:Yes
 } ObsRecord;
 
 typedef struct
 {
     int obs_n;
-    ObsRecord obs_records[LOADOBS_MAX_RECORD_N];
+    ObsRecord *obs_records;
 } ObsTable;
 
 typedef struct
@@ -180,7 +194,7 @@ typedef struct
 
 typedef struct
 {
-    HeartbeatRecord heartbeat_records[LOADOBS_MAX_RECORD_N];
+    HeartbeatRecord *heartbeat_records;
 } HeartbeatTable;
 
 /// @brief load Obs from decoded obs file
@@ -222,41 +236,35 @@ int uniqueTagID(const ObsTable *obs_table, int *unique_tag_ids);
 void interpObsTable(const ObsTable *obs_table, ObsTable *obs_table_new, const gtimeSeries *time_series,
                     const int *unique_anchor_ids, const int unique_anchor_n, const int *unique_tag_ids, const int unique_tag_n);
 
+void freeObsTable(ObsTable *obs_table);
+
 /* LOADOBS END ============================================*/
 
 /* LSQ START ==============================================*/
 
-typedef struct 
+typedef struct
 {
     gtime_t time;
     int tag_id;
-    double n,e,u;
-    double D[3*3];
+    double n, e, u;
+    double D[3 * 3];
 } ResRecord;
 
-typedef struct 
+typedef struct
 {
     int n;
-    ResRecord res_records[LOADOBS_MAX_INTERP_RECORD_N];
+    ResRecord *res_records;
 } ResTable;
 
 /// @brief Process all tag one epoch data with LSQ algorithm, store result in res_table
+/// @param anchor_table   I anchor table
 /// @param obs_table_new  I obs data
 /// @param epoch          I chosen epoch
 /// @param unique_tag_ids I chosen tag id
 /// @param unique_tag_n   I number of chosen tag
 /// @param res_table      O res table
-void leastSquareOneEpoch(const ObsTable *obs_table, const gtime_t epoch, const int *unique_tag_ids, const int unique_tag_n, ResTable* res_table);
-
-/// @brief Process one tag one epoch data with LSQ algorithm, store result in res_table
-/// @param obs_table_new I obs data
-/// @param epoch         I chosen epoch
-/// @param tag_id        I chosen tag id
-/// @param res_table     O res table
-void leastSquareOneEpochOneTag(const ObsTable *obs_table, const gtime_t epoch, const int tag_id, ResTable* res_table);
-
+void leastSquareOneEpoch(const AnchorTable *anchor_table, const ObsTable *obs_table, const gtime_t epoch, const int *unique_tag_ids, const int unique_tag_n, ResTable *res_table);
 
 /* LSQ END ================================================*/
-
 
 #endif

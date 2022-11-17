@@ -40,6 +40,7 @@ int main(int argc, char const *argv[])
     // 1.7 interp obs to new obs at time series
     ObsTable obs_table_new = {0};
     interpObsTable(&obs_table, &obs_table_new, &time_series, unique_anchor_ids, unique_anchor_n, unique_tag_ids, unique_tag_n);
+    freeObsTable(&obs_table);
 
     // 1.8 sort all obs again
     sortByTime(&obs_table_new);
@@ -55,19 +56,18 @@ int main(int argc, char const *argv[])
     AnchorTable anchor_table = {0};
     readAnchorTable(&config, &anchor_table);
 
-    // 3 PROCESS EPOCH
+    // 3 PROCESS BY EPOCH or BY TAG???
+    ResTable res_table = {0};
+    res_table.n=time_series.n;
+    res_table.res_records = malloc(sizeof(ResRecord)*res_table.n);
     for(int epoch_i = 0; epoch_i<time_series.n; epoch_i++)
     {
-        
+        leastSquareOneEpoch(&anchor_table, &obs_table_new, time_series.times[epoch_i], unique_tag_ids, unique_tag_n, &res_table);
     }
-
-
-
-
-
 
     // Free!!!
     freeTimeSeries(&time_series);
+    freeObsTable(&obs_table_new);
 
 
 

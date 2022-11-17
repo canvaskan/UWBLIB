@@ -103,6 +103,61 @@ extern double timediff(gtime_t t1, gtime_t t2)
 {
     return difftime(t1.time, t2.time) + t1.sec - t2.sec;
 }
+/* time to calendar day/time ---------------------------------------------------
+ * convert gtime_t struct to calendar day/time
+ * args   : gtime_t t        I   gtime_t struct
+ *          double *ep       O   day/time {year,month,day,hour,min,sec}
+ * return : none
+ * notes  : proper in 1970-2037 or 1970-2099 (64bit time_t)
+ *-----------------------------------------------------------------------------*/
+extern void time2epoch(gtime_t t, double *ep)
+{
+    const int mday[] = {/* # of days in a month */
+                        31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31,
+                        31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+    int days, sec, mon, day;
+
+    /* leap year if year%4==0 in 1901-2099 */
+    days = (int)(t.time / 86400);
+    sec = (int)(t.time - (time_t)days * 86400);
+    for (day = days % 1461, mon = 0; mon < 48; mon++)
+    {
+        if (day >= mday[mon])
+            day -= mday[mon];
+        else
+            break;
+    }
+    ep[0] = 1970 + days / 1461 * 4 + mon / 12;
+    ep[1] = mon % 12 + 1;
+    ep[2] = day + 1;
+    ep[3] = sec / 3600;
+    ep[4] = sec % 3600 / 60;
+    ep[5] = sec % 60 + t.sec;
+}
+/* time to string --------------------------------------------------------------
+ * convert gtime_t struct to string
+ * args   : gtime_t t        I   gtime_t struct
+ *          char   *s        O   string ("yyyy/mm/dd hh:mm:ss.ssss")
+ *          int    n         I   number of decimals
+ * return : none
+ *-----------------------------------------------------------------------------*/
+extern void time2str(gtime_t t, char *s, int n)
+{
+    double ep[6];
+
+    if (n < 0)
+        n = 0;
+    else if (n > 12)
+        n = 12;
+    if (1.0 - t.sec < 0.5 / pow(10.0, n))
+    {
+        t.time++;
+        t.sec = 0.0;
+    };
+    time2epoch(t, ep);
+    sprintf(s, "%04.0f/%02.0f/%02.0f %02.0f:%02.0f:%0*.*f", ep[0], ep[1], ep[2],
+            ep[3], ep[4], n <= 0 ? 2 : n + 3, n <= 0 ? 0 : n, ep[5]);
+}
 
 void makeTimeSeries(gtimeSeries *time_series, gtime_t start_time, gtime_t end_time, double interval_sec)
 {
@@ -147,39 +202,65 @@ void linearInterp(const double *x, const double *y, const double n, const double
     gsl_interp_accel_free(acc);
 }
 
-gsl_matrix *inverseMatrix(const gsl_matrix *mat)
+void inverseMatrix(const gsl_matrix *mat, gsl_matrix * inv)
 {
     if (mat->size1 != mat->size2)
     {
         printf("ERROR: inverseMatrix need square matrix\n");
         exit(EXIT_FAILURE);
     }
-    gsl_permutation *p = gsl_permutation_alloc(mat->size1 * mat->size2);
+
+    gsl_matrix *copy = gsl_matrix_alloc(mat->size1, mat->size2);
+    gsl_matrix_memcpy(copy, mat); // LU decomp is IO
+
+    gsl_permutation *p = gsl_permutation_alloc(copy->size1);
     int s;
 
     // Compute the LU decomposition of this matrix
-    gsl_linalg_LU_decomp(mat, p, &s);
+    gsl_linalg_LU_decomp(copy, p, &s);
 
     // Compute the  inverse of the LU decomposition
-    gsl_matrix *inv = gsl_matrix_alloc(mat->size1, mat->size2);
-    gsl_linalg_LU_invert(mat, p, inv);
+    gsl_linalg_LU_invert(copy, p, inv);
 
     gsl_permutation_free(p);
+    gsl_matrix_free(copy);
+}
 
-    return inv;
+void printfMatrix(const gsl_matrix *mat)
+{
+    for (int i = 0; i < mat->size1; i++)
+    {
+        for (int j = 0; j < mat->size2; j++)
+        {
+            printf("% g\t", gsl_matrix_get(mat, i, j));
+        }
+        printf("\n");
+    }
 }
 
 void solveLSQ(const gsl_matrix *B, const gsl_matrix *P, const gsl_matrix *l, gsl_matrix *x, gsl_matrix *Dx)
 {
     gsl_matrix *BTP = gsl_matrix_alloc(B->size2, P->size2);
     gsl_blas_dgemm(CblasTrans, CblasNoTrans, 1.0, B, P, 0.0, BTP);
+
     gsl_matrix *BTPB = gsl_matrix_alloc(BTP->size1, B->size2);
     gsl_blas_dgemm(CblasNoTrans, CblasNoTrans, 1.0, BTP, B, 0.0, BTPB);
-    Dx = inverseMatrix(BTPB);
+    printf("BTPB Matrix\n");
+    printfMatrix(BTPB);
+
+    inverseMatrix(BTPB, Dx);
+    printf("BTPBinv Matrix\n");
+    printfMatrix(Dx);
+
     gsl_matrix *BTPl = gsl_matrix_alloc(BTP->size1, l->size2);
+    gsl_blas_dgemm(CblasNoTrans, CblasNoTrans, 1.0, BTP, l, 0.0, BTPl);
+    printf("BTPl Matrix\n");
+    printfMatrix(BTPl);
+
     gsl_blas_dgemm(CblasNoTrans, CblasNoTrans, 1.0, Dx, BTPl, 0.0, x);
 
     gsl_matrix_free(BTP);
     gsl_matrix_free(BTPB);
     gsl_matrix_free(BTPl);
 }
+

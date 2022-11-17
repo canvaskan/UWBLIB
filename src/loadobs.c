@@ -3,6 +3,8 @@
 void loadObsTable(const Config *config, ObsTable *obs_table)
 {
     int obs_i = 0;
+
+    // count how many records are there
     for (int i = 0; i < CONFIG_MAX_OBS_FILE_N; i++)
     {
         if (config->obs_files[i][0] == '\0')
@@ -11,6 +13,43 @@ void loadObsTable(const Config *config, ObsTable *obs_table)
         }
         char obs_file[MAX_LINE_LEN] = "";
         strcpy(obs_file, config->obs_files[i]);
+
+        FILE *fr = fopen(strcat(obs_file, DECODE_ASCII_OBS_SUFFIX), "r");
+        if (!fr)
+        {
+            printf("loadObsTable cannot open file!\n");
+            exit(EXIT_FAILURE);
+        }
+
+        char line[MAX_LINE_LEN];
+        // skip header
+        fgets(line, MAX_LINE_LEN, fr);
+        while (fgets(line, MAX_LINE_LEN, fr))
+        {
+            obs_i++;
+        }
+    }
+
+    // allocate memory for ObsTable
+    obs_table->obs_n = obs_i;
+    obs_table->obs_records = malloc(obs_i * sizeof(ObsRecord));
+    if (obs_table->obs_records == NULL)
+    {
+        printf("ERROR: loadObsTable cannot allocate memory!\n");
+        exit(EXIT_FAILURE);
+    }
+
+    // load the obs records
+    obs_i = 0;
+    for (int i = 0; i < CONFIG_MAX_OBS_FILE_N; i++)
+    {
+        if (config->obs_files[i][0] == '\0')
+        {
+            continue;
+        }
+        char obs_file[MAX_LINE_LEN] = "";
+        strcpy(obs_file, config->obs_files[i]);
+
         FILE *fr = fopen(strcat(obs_file, DECODE_ASCII_OBS_SUFFIX), "r");
         if (!fr)
         {
@@ -57,12 +96,6 @@ void loadObsTable(const Config *config, ObsTable *obs_table)
         }
         fclose(fr);
     }
-    if (obs_i > LOADOBS_MAX_RECORD_N)
-    {
-        printf("ERROR: loadObsTable detect more obs records than LOADOBS_MAX_RECORD_N! change its value and retry\n");
-        exit(EXIT_FAILURE);
-    }
-    obs_table->obs_n = obs_i;
 }
 
 void imputeTime(ObsTable *obs_table)
@@ -219,11 +252,11 @@ void interpObsTable(const ObsTable *obs_table, ObsTable *obs_table_new, const gt
                     const int *unique_anchor_ids, const int unique_anchor_n, const int *unique_tag_ids, const int unique_tag_n)
 {
     int obs_new_i = 0;
-    // check memory size
-    if (time_series->n > LOADOBS_MAX_INTERP_RECORD_N)
+    int reserve_n = time_series->n * unique_anchor_n * unique_tag_n;
+    obs_table_new->obs_records = malloc(reserve_n * sizeof(ObsRecord));
+    if (obs_table_new->obs_records == NULL)
     {
-        printf("ERROR: interpObsTable detect time_series->n = %d > LOADOBS_MAX_INTERP_RECORD_N = %d, need to change LOADOBS_MAX_INTERP_RECORD_N value!\n",
-               time_series->n, LOADOBS_MAX_INTERP_RECORD_N);
+        printf("ERROR: interpObsTable cannot allocate memory!\n");
         exit(EXIT_FAILURE);
     }
 
@@ -321,11 +354,22 @@ void interpObsTable(const ObsTable *obs_table, ObsTable *obs_table_new, const gt
             obs_table_new->obs_n += time_series->n;
             for (int i = 0; i < time_series->n; i++)
             {
+                int is_interp = 1;
+                for (int j = 0; j < data_i; j++)
+                {
+                    // if interp point is very near to the actual obs point, it is considered to be actual obs. //TODO make them more weights
+                    if (fabs(x_new[i] - x[j]) < 0.1)
+                    {
+                        is_interp = 0;
+                        break;
+                    }
+                }
                 obs_table_new->obs_records[obs_new_i].time.time = floor(x_new[i]);
                 obs_table_new->obs_records[obs_new_i].time.sec = x_new[i] - floor(x_new[i]);
                 obs_table_new->obs_records[obs_new_i].distance = y_new[i];
                 obs_table_new->obs_records[obs_new_i].anchor_id = anchor_id;
                 obs_table_new->obs_records[obs_new_i].tag_id = tag_id;
+                obs_table_new->obs_records[obs_new_i].is_interp = is_interp;
                 obs_new_i++;
             }
 
@@ -335,4 +379,10 @@ void interpObsTable(const ObsTable *obs_table, ObsTable *obs_table_new, const gt
         }
     }
     free(x_new);
+}
+
+void freeObsTable(ObsTable *obs_table)
+{
+    obs_table->obs_n = 0;
+    free(obs_table->obs_records);
 }
